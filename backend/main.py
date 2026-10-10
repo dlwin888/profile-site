@@ -1,7 +1,8 @@
 import sqlite3
+import uuid
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -9,12 +10,14 @@ app = FastAPI(title="文字实验室 API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://profile.m3u8player.com.cn"],
+    allow_origins=["https://profile.m3u8player.com.cn", "http://localhost:8000"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 DB_PATH = Path(__file__).parent / "data" / "app.db"
+COOKIE_NAME = "lab_session"
 
 
 def get_conn():
@@ -30,6 +33,7 @@ def init_db():
             """
             CREATE TABLE IF NOT EXISTS analyses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
                 text TEXT NOT NULL,
                 char_count INTEGER NOT NULL,
                 word_count INTEGER NOT NULL,
@@ -42,26 +46,41 @@ def init_db():
 init_db()
 
 
-def save_analysis(text: str, char_count: int, word_count: int) -> None:
+def save_analysis(session_id: str, text: str, char_count: int, word_count: int) -> None:
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO analyses (text, char_count, word_count) VALUES (?, ?, ?)",
-            (text, char_count, word_count),
+            "INSERT INTO analyses (session_id, text, char_count, word_count) VALUES (?, ?, ?, ?)",
+            (session_id, text, char_count, word_count),
         )
 
 
-def get_recent(limit: int = 5) -> list[dict]:
+def get_recent(session_id: str, limit: int = 5) -> list[dict]:
     with get_conn() as conn:
         rows = conn.execute(
             """
             SELECT id, text, char_count, word_count, created_at
             FROM analyses
+            WHERE session_id = ?
             ORDER BY id DESC
             LIMIT ?
             """,
-            (limit,),
+            (session_id, limit),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def get_or_create_session(request: Request, response: Response) -> str:
+    session_id = request.cookies.get(COOKIE_NAME)
+    if not session_id:
+        session_id = uuid.uuid4().hex
+        response.set_cookie(
+            key=COOKIE_NAME,
+            value=session_id,
+            httponly=True,
+            samesite="lax",
+            max_age=60 * 60 * 24 * 30,  # 30 天
+        )
+    return session_id
 
 
 class AnalyzeRequest(BaseModel):
@@ -82,7 +101,9 @@ def health():
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
-def analyze(req: AnalyzeRequest):
+def analyze(req: AnalyzeRequest, request: Request, response: Response):
+    session_id = get_or_create_session(request, response)
+
     text = req.text
     trimmed = text.strip()
 
@@ -92,7 +113,7 @@ def analyze(req: AnalyzeRequest):
     chinese_count = sum(1 for ch in text if "\u4e00" <= ch <= "\u9fa5")
     reversed_text = text[::-1]
 
-    save_analysis(text, char_count, word_count)
+    save_analysis(session_id, text, char_count, word_count)
 
     return AnalyzeResponse(
         char_count=char_count,
@@ -104,5 +125,6 @@ def analyze(req: AnalyzeRequest):
 
 
 @app.get("/api/history")
-def history():
-    return {"items": get_recent(5)}
+def history(request: Request, response: Response):
+    session_id = get_or_create_session(request, response)
+    return {"items": get_recent(session_id, 5)}

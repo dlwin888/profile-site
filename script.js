@@ -52,6 +52,7 @@ async function analyzeOnServer(text) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
+    credentials: "include",
   });
 
   if (!res.ok) {
@@ -74,6 +75,7 @@ analyzeBtn.addEventListener("click", async () => {
   try {
     const data = await analyzeOnServer(text);
     renderResult(data);
+    renderHistory();
   } catch (err) {
     renderError(`请求失败：${err.message}。请确认后端在 ${API_BASE} 运行。`);
   } finally {
@@ -86,3 +88,34 @@ clearBtn.addEventListener("click", () => {
   labResult.hidden = true;
   labInput.focus();
 });
+
+async function fetchHistory() {
+  const res = await fetch(`${API_BASE}/api/history`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function renderHistory() {
+  const container = document.getElementById("historyList");
+  if (!container) return;
+  try {
+    const data = await fetchHistory();
+    if (!data.items || data.items.length === 0) {
+      container.innerHTML = `<li>还没有记录</li>`;
+      return;
+    }
+    container.innerHTML = data.items
+      .map(
+        (it) =>
+          `<li><code>${escapeHtml(it.text.slice(0, 30))}</code> — ${it.char_count} 字</li>`
+      )
+      .join("");
+  } catch (err) {
+    container.innerHTML = `<li>加载失败：${escapeHtml(err.message)}</li>`;
+  }
+}
+
+// 页面加载时拉一次
+renderHistory();
