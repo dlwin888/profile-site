@@ -69,3 +69,64 @@ footer {
   padding: 2rem;
   opacity: 0.7;
 }
+
+/* 文字实验室 */
+.hint {
+  opacity: 0.7;
+  font-size: 0.95rem;
+  margin-top: 0;
+}
+
+#labInput {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(127, 127, 127, 0.3);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+#labInput:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.lab-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid rgba(127, 127, 127, 0.4);
+}
+
+.lab-result {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: var(--bg);
+  border: 1px solid rgba(127, 127, 127, 0.2);
+}
+
+.lab-result dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1rem;
+}
+
+.lab-result dt {
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.lab-result dd {
+  margin: 0;
+  word-break: break-word;
+}
