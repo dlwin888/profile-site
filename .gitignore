@@ -6,3 +6,6 @@ node_modules/
 .venv/
 __pycache__/
 *.pyc
+
+# 数据库文件
+backend/data/
