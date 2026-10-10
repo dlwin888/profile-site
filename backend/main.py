@@ -7,7 +7,7 @@ app = FastAPI(title="文字实验室 API")
 # 允许本地前端跨域访问
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 开发阶段先放开，上线前再收紧
+    allow_origins=["https://profile.m3u8player.com.cn"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
