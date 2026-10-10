@@ -9,7 +9,7 @@ btn.addEventListener("click", () => {
 document.getElementById("year").textContent = new Date().getFullYear();
 
 // ===== 文字实验室 =====
-const API_BASE = "http://127.0.0.1:8001";
+const API_BASE = "https://api.m3u8player.com.cn";
 
 const labInput = document.getElementById("labInput");
 const analyzeBtn = document.getElementById("analyzeBtn");
