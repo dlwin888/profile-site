@@ -128,3 +128,12 @@ def analyze(req: AnalyzeRequest, request: Request, response: Response):
 def history(request: Request, response: Response):
     session_id = get_or_create_session(request, response)
     return {"items": get_recent(session_id, 5)}
+
+@app.get("/api/stats")
+def get_stats():
+    with get_conn() as conn:
+        # 使用 SQL 聚合函数 COUNT 统计全站总记录数
+        row = conn.execute("SELECT COUNT(*) as total FROM analyses").fetchone()
+        total = row["total"] if row else 0
+        
+    return {"total_analyses": total}
