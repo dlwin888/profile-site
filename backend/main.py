@@ -137,3 +137,27 @@ def get_stats():
         total = row["total"] if row else 0
         
     return {"total_analyses": total}
+    
+    
+from fastapi import HTTPException
+
+@app.delete("/api/history/{item_id}")
+def delete_history(item_id: int, request: Request):
+    # 1. 获取当前用户的 session_id
+    session_id = request.cookies.get(COOKIE_NAME)
+    if not session_id:
+        raise HTTPException(status_code=401, detail="未登录或会话已过期")
+
+    with get_conn() as conn:
+        # 2. 执行删除，必须同时满足 id 匹配且 session_id 匹配！
+        cursor = conn.execute(
+            "DELETE FROM analyses WHERE id = ? AND session_id = ?",
+            (item_id, session_id)
+        )
+        
+        # 3. cursor.rowcount 表示影响了几行数据
+        if cursor.rowcount == 0:
+            # 如果为 0，说明要么 id 不存在，要么这条记录不属于当前用户
+            raise HTTPException(status_code=404, detail="记录不存在或无权限删除")
+
+    return {"status": "ok", "message": "删除成功"}
