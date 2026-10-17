@@ -10,7 +10,7 @@ app = FastAPI(title="文字实验室 API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://profile.m3u8player.com.cn", "http://localhost:8000"],
+    allow_origins=["https://profile.m3u8player.com.cn", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
