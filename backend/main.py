@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="文字实验室 API")
+app = FastAPI(title="零到全栈 API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,13 +19,11 @@ app.add_middleware(
 DB_PATH = Path(__file__).parent / "data" / "app.db"
 COOKIE_NAME = "lab_session"
 
-
 def get_conn():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
-
 
 def init_db():
     with get_conn() as conn:
@@ -42,122 +40,67 @@ def init_db():
             """
         )
 
-
 init_db()
-
-
-def save_analysis(session_id: str, text: str, char_count: int, word_count: int) -> None:
-    with get_conn() as conn:
-        conn.execute(
-            "INSERT INTO analyses (session_id, text, char_count, word_count) VALUES (?, ?, ?, ?)",
-            (session_id, text, char_count, word_count),
-        )
-
-
-def get_recent(session_id: str, limit: int = 5) -> list[dict]:
-    with get_conn() as conn:
-        rows = conn.execute(
-            """
-            SELECT id, text, char_count, word_count, created_at
-            FROM analyses
-            WHERE session_id = ?
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (session_id, limit),
-        ).fetchall()
-    return [dict(r) for r in rows]
-
 
 def get_or_create_session(request: Request, response: Response) -> str:
     session_id = request.cookies.get(COOKIE_NAME)
     if not session_id:
         session_id = uuid.uuid4().hex
         response.set_cookie(
-            key=COOKIE_NAME,
-            value=session_id,
-            httponly=True,
-            samesite="lax",
-            max_age=60 * 60 * 24 * 30,  # 30 天
+            key=COOKIE_NAME, value=session_id,
+            httponly=True, samesite="lax", max_age=60 * 60 * 24 * 30,
         )
     return session_id
 
+# ================= 接口定义 =================
+
+@app.get("/api/profile")
+def get_profile():
+    # 教程要求：主页的标题、副标题、作品和座右铭来自 API
+    return {
+        "heroTitle": "你好，我是杜磊",
+        "heroSubtitle": "项目，创意，灵感，心得，我的作品",
+        "featuredWork": {
+            "kicker": "作品",
+            "title": "文字实验室",
+            "copy": "拼音和情绪，挖掘中文里的细节",
+            "linkLabel": "打开作品"
+        },
+        "identity": {
+            "motto": "已识乾坤大，尤怜草木青",
+            "learning": "零到全栈"
+        }
+    }
 
 class AnalyzeRequest(BaseModel):
     text: str
 
-
-class AnalyzeResponse(BaseModel):
-    char_count: int
-    char_no_space: int
-    word_count: int
-    chinese_count: int
-    reversed_text: str
-
-
-@app.get("/api/health")
-def health():
-    return {"status": "ok"}
-
-
-@app.post("/api/analyze", response_model=AnalyzeResponse)
+@app.post("/api/analyze")
 def analyze(req: AnalyzeRequest, request: Request, response: Response):
     session_id = get_or_create_session(request, response)
-
     text = req.text
-    trimmed = text.strip()
-
+    
     char_count = len(text)
-    char_no_space = len("".join(text.split()))
-    word_count = len(trimmed.split()) if trimmed else 0
-    chinese_count = sum(1 for ch in text if "\u4e00" <= ch <= "\u9fa5")
-    reversed_text = text[::-1]
-
-    save_analysis(session_id, text, char_count, word_count)
-
-    return AnalyzeResponse(
-        char_count=char_count,
-        char_no_space=char_no_space,
-        word_count=word_count,
-        chinese_count=chinese_count,
-        reversed_text=reversed_text,
-    )
-
-
-@app.get("/api/history")
-def history(request: Request, response: Response):
-    session_id = get_or_create_session(request, response)
-    return {"items": get_recent(session_id, 5)}
-
-@app.get("/api/stats")
-def get_stats():
-    with get_conn() as conn:
-        # 使用 SQL 聚合函数 COUNT 统计全站总记录数
-        row = conn.execute("SELECT COUNT(*) as total FROM analyses").fetchone()
-        total = row["total"] if row else 0
-        
-    return {"total_analyses": total}
+    word_count = len(text.strip().split()) if text.strip() else 0
     
-    
-from fastapi import HTTPException
-
-@app.delete("/api/history/{item_id}")
-def delete_history(item_id: int, request: Request):
-    # 1. 获取当前用户的 session_id
-    session_id = request.cookies.get(COOKIE_NAME)
-    if not session_id:
-        raise HTTPException(status_code=401, detail="未登录或会话已过期")
-
     with get_conn() as conn:
-        # 2. 执行删除，必须同时满足 id 匹配且 session_id 匹配！
-        cursor = conn.execute(
-            "DELETE FROM analyses WHERE id = ? AND session_id = ?",
-            (item_id, session_id)
+        conn.execute(
+            "INSERT INTO analyses (session_id, text, char_count, word_count) VALUES (?, ?, ?, ?)",
+            (session_id, text, char_count, word_count),
         )
         
-        # 3. cursor.rowcount 表示影响了几行数据
-        if cursor.rowcount == 0:
-            # 如果为 0，说明要么 id 不存在，要么这条记录不属于当前用户
-            raise HTTPException(status_code=404, detail="记录不存在或无权限删除")
+    return {
+        "char_count": char_count,
+        "word_count": word_count,
+        "reversed_text": text[::-1]
+    }
 
-    return {"status": "ok", "message": "删除成功"}
+@app.get("/api/history")
+def get_history(request: Request, response: Response):
+    session_id = get_or_create_session(request, response)
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, text, char_count, created_at FROM analyses WHERE session_id = ? ORDER BY id DESC LIMIT 20",
+            (session_id,),
+        ).fetchall()
+    return {"items": [dict(r) for r in rows]}
