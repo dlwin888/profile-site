@@ -58,7 +58,7 @@ def get_or_create_session(request: Request, response: Response) -> str:
 def get_profile():
     # 教程要求：主页的标题、副标题、作品和座右铭来自 API
     return {
-        "heroTitle": "你好，我是杜磊",
+        "heroTitle": "你好，我是段乐",
         "heroSubtitle": "项目，创意，灵感，心得，我的作品",
         "featuredWork": {
             "kicker": "作品",
