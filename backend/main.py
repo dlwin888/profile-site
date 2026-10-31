@@ -8,6 +8,8 @@ from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+import os
+from zhipuai import ZhipuAI
 
 app = FastAPI(title="零到全栈 API")
 # 初始化限流器，按客户端 IP 地址进行限制
@@ -132,3 +134,32 @@ def delete_history(item_id: int, request: Request):
             raise HTTPException(status_code=404, detail="记录不存在或无权限删除")
 
     return {"status": "ok", "message": "删除成功"}
+
+# 初始化客户端 (会自动读取 ZHIPUAI_API_KEY 环境变量)
+# 如果没有环境变量，也可以在 ZhipuAI(api_key="your-key") 中指定
+zhipu_client = ZhipuAI()
+
+class AIRequest(BaseModel):
+    text: str
+
+@app.post("/api/ai-analyze")
+@limiter.limit("5/minute") # 同样加上限流保护
+def ai_analyze(req: AIRequest, request: Request):
+    if not req.text.strip():
+        raise HTTPException(status_code=400, detail="文本不能为空")
+
+    try:
+        response = zhipu_client.chat.completions.create(
+            model="glm-4-flash", # 使用免费模型
+            messages=[
+                {"role": "system", "content": "你是一个文本分析专家。请对用户提供的文本进行情感分析、关键词提取和一句话总结。请用简洁的格式返回。"},
+                {"role": "user", "content": req.text}
+            ],
+            stream=False, # 暂时使用非流式，响应快
+        )
+        ai_result = response.choices[0].message.content
+        return {"result": ai_result}
+    
+    except Exception as e:
+        print(f"AI调用失败: {e}")
+        raise HTTPException(status_code=500, detail="AI 服务暂时不可用")
