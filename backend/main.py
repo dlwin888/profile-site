@@ -5,8 +5,15 @@ from pathlib import Path
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 app = FastAPI(title="零到全栈 API")
+# 初始化限流器，按客户端 IP 地址进行限制
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -76,6 +83,7 @@ class AnalyzeRequest(BaseModel):
     text: str
 
 @app.post("/api/analyze")
+@limiter.limit("5/minute")  # 👈 新增：每分钟最多 5 次
 def analyze(req: AnalyzeRequest, request: Request, response: Response):
     session_id = get_or_create_session(request, response)
     text = req.text
