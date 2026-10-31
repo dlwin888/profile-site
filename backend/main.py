@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -104,3 +104,23 @@ def get_history(request: Request, response: Response):
             (session_id,),
         ).fetchall()
     return {"items": [dict(r) for r in rows]}
+
+@app.delete("/api/history/{item_id}")
+def delete_history(item_id: int, request: Request):
+    # 获取当前用户的 session_id
+    session_id = request.cookies.get(COOKIE_NAME)
+    if not session_id:
+        raise HTTPException(status_code=401, detail="未登录或会话已过期")
+
+    with get_conn() as conn:
+        # 核心安全逻辑：必须同时匹配 id 和 session_id 才能删除
+        cursor = conn.execute(
+            "DELETE FROM analyses WHERE id = ? AND session_id = ?",
+            (item_id, session_id)
+        )
+        
+        # 如果影响行数为 0，说明这条记录不存在，或者不属于当前用户
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="记录不存在或无权限删除")
+
+    return {"status": "ok", "message": "删除成功"}
